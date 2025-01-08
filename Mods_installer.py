@@ -4,7 +4,7 @@ import shutil
 import requests
 from colorama import init, Fore, Back
 import datetime
-import time
+import re
 
 init(autoreset=True)
 
@@ -113,17 +113,20 @@ def mods_only():
 
     extraction()
 
+
 def backup_path():
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     backup_zip = os.path.join(backup_folder, f"old_mods_{timestamp}.zip")
     print(Back.GREEN + f"Backing up old mods to: {backup_zip}")
     return backup_zip
 
+
 def backup_mods():
     while True:
         choice = input(f"Would you like to create a backup of your current mods folder? {Fore.CYAN}(Type {Fore.WHITE}'yes'/'no'{Fore.CYAN}) \n {Fore.WHITE}>>")
 
-        if choice.lower() == 'yes' or choice.lower() == 'y':
+
+        if choice.lower() in ('yes', 'y'):
             if os.path.isdir(mod_folder):
                 backup_zip = backup_path()
                 try:
@@ -131,8 +134,8 @@ def backup_mods():
                         for root, dirs, files in os.walk(mod_folder):
                             for file in files:
                                 file_path = os.path.join(root, file)
-                                arcname = os.path.relpath(file_path, start=mod_folder)
-                                zipf.write(file_path, arcname)
+                                name = os.path.relpath(file_path, start=mod_folder)
+                                zipf.write(file_path, name)
                     print("Backup finished.")
                     break
                 except Exception as e:
@@ -140,7 +143,7 @@ def backup_mods():
             else:
                 print("No mods folder to back up...")
                 break
-        elif choice.lower() == 'no' or choice.lower() == 'n':
+        elif choice.lower() in ('no', 'n'):
             print("Backup canceled.")
             break
         else:
@@ -156,6 +159,7 @@ def mods_folder_safety():
 def reset_program():
     os.system('clear')
 
+
 def listing_consts():
     print(f"1. Mods url = {zip_url}")
     print(f"2. Mods folder = {mod_folder}")
@@ -168,39 +172,95 @@ def listing_consts():
 
     return edit_const
 
+def path_check(new_path):
+    if os.path.isdir(new_path):
+        reset_program()
+        print(f"{Fore.GREEN}Changed to {new_path}")
+        return True
+    else:
+        reset_program
+        print(f"{Fore.RED}You sent an invalid path: {new_path}")
+        new_path_q = input(f"Would you like to create {new_path} \n >> ")
+
+        if path_creation(new_path, new_path_q):  
+            reset_program()
+            print(f"{Fore.GREEN}Created path: {new_path}")
+            return True
+        else:
+            print(f"{Fore.YELLOW}Path creation canceled.")
+            return False
+
+def path_creation(new_path, new_path_q):
+    if new_path_q.lower() in ('yes', 'y'):
+        try:
+            os.mkdir(new_path)
+            return True
+        except OSError as e:
+            print(f"{Fore.RED}OS error while creating directory: {e}")
+            return False
+
+    elif new_path_q.lower() in ('no', 'n'):
+        return False
+
+    else:
+        print(f"{Fore.YELLOW}Invalid input. Path creation canceled.")
+        return False
+
+
 def const_editing():
     global zip_url, mod_folder, backup_folder, installer_path, installer_link
 
-    edit_const = listing_consts()
-
     while True:
         try:
+            edit_const = listing_consts()
+
             if edit_const == "1":
+                reset_program()
                 new_url = input("Send the new URL for mods. \n >> ")
                 zip_url = new_url
+                print(f"Mods URL updated to: {zip_url}")
                 break
+
             elif edit_const == "2":
+                reset_program()
                 new_mod_folder = input("Send the new mods folder path. \n >> ")
-                mod_folder = new_mod_folder
+                if path_check(new_mod_folder):
+                    mod_folder = new_mod_folder
+
                 break
+
             elif edit_const == "3":
+                reset_program()
                 new_backup_folder = input("Send the new backup folder path. \n >> ")
-                backup_folder = new_backup_folder
+                if path_check(new_backup_folder):
+                    backup_folder = new_backup_folder
                 break
+
             elif edit_const == "4":
+                reset_program()
                 new_installer_path = input("Send the new installer save location. \n >> ")
-                installer_path = new_installer_path
+                if path_check(new_installer_path):
+                    installer_path = new_installer_path
                 break
+
             elif edit_const == "5":
+                reset_program()
                 new_installer_link = input("Send the new installer link. \n >> ")
                 installer_link = new_installer_link
+                print(f"Installer link updated to: {installer_link}")
                 break
+
             elif edit_const == "6":
-                reset_program()
                 print("Exiting...")
+                reset_program()
                 break
+
+            else:
+                reset_program()
+                print("Invalid option. Please try again.")
+
         except Exception as e:
-            print(f"an error occured: {e}")
+            print(f"An error occurred: {e}")
 
     return zip_url, mod_folder, backup_folder, installer_path, installer_link
 
@@ -212,7 +272,6 @@ def main():
             if choice == "1" or choice == "2":
                 reset_program()
                 backup_mods()
-
 
                 if choice == "1":
                     mods_folder_safety()
