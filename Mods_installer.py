@@ -5,6 +5,8 @@ import requests
 from colorama import init, Fore, Back
 import datetime
 import re
+from tqdm import tqdm
+
 
 init(autoreset=True)
 
@@ -25,14 +27,15 @@ def file_downloading(link, path, name):
 
     try:
         print(f"{Fore.GREEN}Downloading {link}{Fore.WHITE} to {Fore.GREEN}{path}")
+        
         with open(path, 'wb') as file:
-            for chunk in r.iter_content(chunk_size=2048):
-                if chunk:
-                    file.write(chunk)
-                    downloaded_size += len(chunk)
 
-                    percent_done = (downloaded_size / total_size) * 100 if total_size else 0
-                    print(f"Progress for {name}: {percent_done:.2f}%", end="\r")
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc=name) as pbar:
+                for chunk in r.iter_content(chunk_size=2048):
+                    if chunk:
+                        file.write(chunk)
+                        pbar.update(len(chunk)) 
+                        
         print(f"\n Done downloading {name}.")
 
     except requests.exceptions.RequestException as e:
@@ -120,35 +123,42 @@ def backup_path():
     return backup_zip
 
 
-def backup_mods():
+def backup_choice():
     while True:
-        choice = input(f"Would you like to create a backup of your current mods folder? {Fore.CYAN}(Type {Fore.WHITE}'yes'/'no'{Fore.CYAN}) \n {Fore.WHITE}>>")
-
-
-        if choice.lower() in ('yes', 'y'):
-            if os.path.isdir(mod_folder):
-                backup_zip = backup_path()
-                try:
-                    with zipfile.ZipFile(backup_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        for root, dirs, files in os.walk(mod_folder):
-                            for file in files:
-                                file_path = os.path.join(root, file)
-                                name = os.path.relpath(file_path, start=mod_folder)
-                                zipf.write(file_path, name)
-                    print("Backup finished.")
-                    break
-                except Exception as e:
-                    print(f"Error occurred, send to my dms: {e}")
-            else:
-                print("No mods folder to back up...")
-                break
-        elif choice.lower() in ('no', 'n'):
-            print("Backup canceled.")
-            break
+        choice = input(
+            f"Would you like to create a backup of your current mods folder? {Fore.CYAN}(Type {Fore.WHITE}'yes'/'no'{Fore.CYAN}) \n {Fore.WHITE}>>"
+        ).lower()
+        if choice in ('yes', 'y'):
+            return True
+        elif choice in ('no', 'n'):
+            return False
         else:
             reset_program()
             print(Fore.RED + "Invalid input. Type 'yes' or 'no'.")
-            continue
+
+
+def create_backup(mod_folder, backup_zip):
+    try:
+        with zipfile.ZipFile(backup_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(mod_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    name = os.path.relpath(file_path, start=mod_folder)
+                    zipf.write(file_path, name)
+        print("Backup finished.")
+    except Exception as e:
+        print(f"Error occurred during backup: {e}")
+
+
+def backup_mods():
+    if backup_choice():
+        if os.path.isdir(mod_folder):
+            backup_zip = backup_path()
+            create_backup(mod_folder, backup_zip)
+        else:
+            print("No mods folder to back up...")
+    else:
+        print("Backup canceled.")
 
 
 def mods_folder_safety():
