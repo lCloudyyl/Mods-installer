@@ -13,7 +13,7 @@ init(autoreset=True)
 zip_url = "https://github.com/lCloudyyl/Mod-pack/releases/latest/download/mods.zip"
 mod_folder = os.path.expandvars(r'%appdata%\.minecraft\mods')
 zip_file = os.path.join(mod_folder, "mods.zip")
-backup_folder = os.path.expandvars(r'%appdata%\.minecraft')
+backup_folder = os.path.expandvars(r'%appdata%\.minecraft\mod_backups')
 installer_path = os.path.expandvars(r"%userprofile%\Downloads\fabric-installer-1.0.1.exe")
 installer_link = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.exe"
 
@@ -22,15 +22,14 @@ def file_downloading(link, path, name):
     r = requests.get(link, stream=True, timeout=30)
     r.raise_for_status()
 
-    total_size = int(r.headers.get('content-length', 0))
-    downloaded_size = 0
+    total = int(r.headers.get('content-length', 0))
 
     try:
-        print(f"{Fore.GREEN}Downloading {link}{Fore.WHITE} to {Fore.GREEN}{path}")
+        print(f"{Fore.GREEN}Downloading {link}{Fore.WHITE} \n to {Fore.GREEN}{path}")
         
         with open(path, 'wb') as file:
 
-            with tqdm(total=total_size, unit='B', unit_scale=True, desc=name) as pbar:
+            with tqdm(total, unit='B', unit_scale=True, desc=name) as pbar:
                 for chunk in r.iter_content(chunk_size=2048):
                     if chunk:
                         file.write(chunk)
@@ -138,13 +137,19 @@ def backup_choice():
 
 
 def create_backup(mod_folder, backup_zip):
+    total_size = sum(os.path.getsize(os.path.join(root, file)) for root, _, files in os.walk(mod_folder) for file in files)
+
     try:
         with zipfile.ZipFile(backup_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(mod_folder):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    name = os.path.relpath(file_path, start=mod_folder)
-                    zipf.write(file_path, name)
+            with tqdm(total = total_size, unit='B', unit_scale=True, desc="backing up mods") as pbar:
+                for root, dirs, files in os.walk(mod_folder):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        name = os.path.relpath(file_path, start=mod_folder)
+                        zipf.write(file_path, name)
+
+                        pbar.update(os.path.getsize(len(file_path)))
+
         print("Backup finished.")
     except Exception as e:
         print(f"Error occurred during backup: {e}")
@@ -153,12 +158,18 @@ def create_backup(mod_folder, backup_zip):
 def backup_mods():
     if backup_choice():
         if os.path.isdir(mod_folder):
+            backup_folder_check()
             backup_zip = backup_path()
             create_backup(mod_folder, backup_zip)
         else:
             print("No mods folder to back up...")
     else:
         print("Backup canceled.")
+
+
+def backup_folder_check():
+    if not os.path.isdir(backup_folder):
+        os.mkdir(backup_folder)
 
 
 def mods_folder_safety():
