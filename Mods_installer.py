@@ -46,7 +46,6 @@ def file_downloading(link, path, name):
 
 
 def folder_check():
-
     try:
         if os.path.isdir(mod_folder):
             shutil.rmtree(mod_folder)
@@ -172,10 +171,10 @@ def listing_consts():
 
     return edit_const
 
-def path_check(new_path):
+def path_check(new_path, task):
     if os.path.isdir(new_path):
         reset_program()
-        print(f"{Fore.GREEN}Changed to {new_path}")
+        print(f"{Fore.GREEN}{task} changed to {new_path}")
         return True
     else:
         reset_program
@@ -184,7 +183,8 @@ def path_check(new_path):
 
         if path_creation(new_path, new_path_q):  
             reset_program()
-            print(f"{Fore.GREEN}Created path: {new_path}")
+            print(f"{Fore.CYAN}Created path: {new_path}")
+            print(f"{Fore.GREEN}{task} changed to {new_path}")
             return True
         else:
             print(f"{Fore.YELLOW}Path creation canceled.")
@@ -196,7 +196,7 @@ def path_creation(new_path, new_path_q):
             os.mkdir(new_path)
             return True
         except OSError as e:
-            print(f"{Fore.RED}OS error while creating directory: {e}")
+            print(f"{Fore.RED}OS error while creating directory(ERR:{e})")
             return False
 
     elif new_path_q.lower() in ('no', 'n'):
@@ -207,52 +207,134 @@ def path_creation(new_path, new_path_q):
         return False
 
 
+def file_info(headers):
+
+    cd = headers.get('content-disposition')
+
+    if not cd:
+        return None, 0
+    
+    fname_match = re.findall(r'filename="?([^";]+)"?', cd)
+    filename = fname_match[0].strip() if fname_match else None
+
+    if not filename:
+        return None, 0
+
+    size = int(headers.get('Content-Length', 0))
+
+    return filename, size
+
+
+def link_valid(link):
+    pattern = re.compile(
+        r'^(https?:\/\/)?'
+        r'(www\.)?'
+        r'([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+        r'(\/[^\s]*)?$'
+    )
+    return bool(pattern.match(link))
+
+
+def link_request(link, task):
+    print("Checking link")
+
+    try:
+        response = requests.get(link)
+
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', '').lower()
+
+            if 'application/' in content_type:
+                filename, size = file_info(response.headers)
+                reset_program()
+                print(f"{Fore.GREEN} Found the download! \n {Fore.WHITE}File_name: {filename} \n Size: {round((size/1000000), 2)} MB")
+                choice = input(f"Would you like to change {task} to {link} \n >> ")
+
+                if choice.lower() in ('yes', 'y'):
+                    reset_program()
+                    print(f"{Fore.GREEN}URL updated to: {Fore.WHITE}{link}")
+                    return True
+                else:
+                    reset_program()
+                    print(f"{Fore.RED}Canceled. {task} unchanged.")
+                    return False
+            else:
+                reset_program()
+                print(f"{Fore.RED} You sent an invalid link. {task} unchanged.")
+        else:
+            reset_program()
+            print(f"{Fore.RED}Download link is accessible, but something is not right (ERR: {response.status_code})  {task} unchanged.")
+
+    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
+        reset_program()
+        print(f"{Fore.RED}Failed to access download link (ERR: {e})  {task} unchanged.")
+    except Exception as e:
+        reset_program()
+        print(f"{Fore.RED}Unexpected error (ERR:{e})  {task} unchanged.")    
+    return False
+
+def link_check(new_link, task):
+    if link_valid(new_link):
+        if link_request(new_link, task):
+            return True
+        else:
+            return False
+    else:
+        reset_program()
+        print(f"{Fore.RED}{task} UNCHANGED: Invalid link sent: {Fore.WHITE}{new_link}")
+        return False
+
+
 def const_editing():
     global zip_url, mod_folder, backup_folder, installer_path, installer_link
 
+    def inputs(task):
+        reset_program()
+        edit = input(f"Send the new {task}")
+        return edit
+    
     while True:
         try:
             edit_const = listing_consts()
 
             if edit_const == "1":
-                reset_program()
-                new_url = input("Send the new URL for mods. \n >> ")
-                zip_url = new_url
-                print(f"Mods URL updated to: {zip_url}")
+                task = "Mods URL"
+                edit = inputs(task)
+                if link_check(edit, task):
+                    zip_url = edit
                 break
 
             elif edit_const == "2":
-                reset_program()
-                new_mod_folder = input("Send the new mods folder path. \n >> ")
-                if path_check(new_mod_folder):
-                    mod_folder = new_mod_folder
-
+                task = "Mods folder"
+                edit = inputs(task)
+                if path_check(edit, task):
+                    mod_folder = edit
                 break
 
             elif edit_const == "3":
-                reset_program()
-                new_backup_folder = input("Send the new backup folder path. \n >> ")
-                if path_check(new_backup_folder):
-                    backup_folder = new_backup_folder
+                task = "Backup folder"
+                edit = inputs(task)
+                if path_check(edit, task):
+                    backup_folder = edit
                 break
 
             elif edit_const == "4":
-                reset_program()
-                new_installer_path = input("Send the new installer save location. \n >> ")
-                if path_check(new_installer_path):
-                    installer_path = new_installer_path
+                task = "Installer location"
+                edit = inputs(task)
+                if path_check(edit, task):
+                    installer_path = edit
                 break
 
             elif edit_const == "5":
-                reset_program()
-                new_installer_link = input("Send the new installer link. \n >> ")
-                installer_link = new_installer_link
-                print(f"Installer link updated to: {installer_link}")
+                task = "Installer link"
+                edit = inputs(task)
+                if link_check(edit, task):
+                    installer_link = edit
                 break
 
             elif edit_const == "6":
-                print("Exiting...")
                 reset_program()
+                print("Exiting...")
                 break
 
             else:
@@ -283,8 +365,7 @@ def main():
                     full_install()
                     delete()
                     reset_program()
-                    print(Back.RED + "On the installer change version to 1.20.1, then 'install' DONT CHANGE SHIT ELSE")
-                    print("")
+                    print(Back.RED + "On the installer change version to 1.20.1, then 'install' DONT CHANGE SHIT ELSE \n")
 
             elif choice == "3":
                 reset_program()
